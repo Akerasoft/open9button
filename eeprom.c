@@ -18,7 +18,6 @@
 #include <avr/eeprom.h>
 #include <string.h>
 #include "eeprom.h"
-#include "rlut.h"
 
 static struct eeprom_data_struct g_eeprom_data;
 
@@ -51,10 +50,10 @@ static char eeprom_init(void)
 
 struct eeprom_data_struct g_current_config = {
 	.magic = { 'E','X','T','E','N','M','O','T','2' },
-	.g_n64_mapping_mode = MODE_N64_STANDARD,
-	.g_n64_curve_id = RLUT_V1_5,
+	.g_n64_mapping_mode = 0,
+	.g_n64_curve_id = 0,
 
-	.g_gc_mapping_mode = MODE_GC_STANDARD,
+	.g_gc_mapping_mode = 0,
 
 	.g_snes_nes_mode = 0,
 	.g_snes_analog_dpad = 0,

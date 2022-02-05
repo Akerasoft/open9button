@@ -1,5 +1,8 @@
-/* Nes/Snes/N64/Gamecube to Wiimote
- * Copyright (C) 2012 Raphaël Assénat
+/* Nes/Snes to Wiimote
+ * Original Copyright (C) 2012 Raphaël Assénat
+ * Changes Copyright by (C) 2022 Akerasoft
+ * Credits:
+ * Robert Kolski is the programmer for Akerasoft.
  *
  * Based on earlier work:
  *
@@ -33,26 +36,23 @@
 #define GAMEPAD_BYTES	2
 
 /******** IO port definitions **************/
-#define SNES_LATCH_DDR	DDRC
-#define SNES_LATCH_PORT	PORTC
-#define SNES_LATCH_BIT	(1<<1)
+#define NES_8_BUTTONS_DDR  DDRD
+#define NES_8_BUTTONS_PORT PORTD
+#define NES_8_BUTTONS_PIN  PIND
 
-#define SNES_CLOCK_DDR	DDRC
-#define SNES_CLOCK_PORT	PORTC
-#define SNES_CLOCK_BIT	(1<<0)
+#define SNES_4_BUTTONS_DDR   DDRC
+#define SNES_4_BUTTONS_PORT  PORTC
+#define SNES_4_BUTTONS_PIN   PINC
+#define SNES_4_BUTTONS_MASK  0xF
+#define SNES_4_BUTTONS_SHIFT 4
 
-#define SNES_DATA_PORT	PORTC
-#define SNES_DATA_DDR	DDRC
-#define SNES_DATA_PIN	PINC
-#define SNES_DATA_BIT	(1<<2)
+#define HOME_BUTTON_PORT   PORTB
+#define HOME_BUTTON_DDR    DDRB
+#define HOME_BUTTON_PIN    PINB
+#define HOME_BUTTON_BIT    (1<<0)
 
-/********* IO port manipulation macros **********/
-#define SNES_LATCH_LOW()	do { SNES_LATCH_PORT &= ~(SNES_LATCH_BIT); } while(0)
-#define SNES_LATCH_HIGH()	do { SNES_LATCH_PORT |= SNES_LATCH_BIT; } while(0)
-#define SNES_CLOCK_LOW()	do { SNES_CLOCK_PORT &= ~(SNES_CLOCK_BIT); } while(0)
-#define SNES_CLOCK_HIGH()	do { SNES_CLOCK_PORT |= SNES_CLOCK_BIT; } while(0)
+#define HOME_BUTTON_DATA_BIT (1<<4)
 
-#define SNES_GET_DATA()	(SNES_DATA_PIN & SNES_DATA_BIT)
 
 /*********** prototypes *************/
 static char snesInit(void);
@@ -72,21 +72,25 @@ static char snesInit(void)
 	sreg = SREG;
 	cli();
 
-	// clock and latch as output
-	SNES_LATCH_DDR |= SNES_LATCH_BIT;
-	SNES_CLOCK_DDR |= SNES_CLOCK_BIT;
+	// 8 NES buttons are input - all bits off
+	NES_8_BUTTONS_DDR = 0;
 
-	// data as input
-	SNES_DATA_DDR &= ~(SNES_DATA_BIT);
-	// enable pullup. This should prevent random toggling of pins
-	// when no controller is connected.
-	SNES_DATA_PORT |= SNES_DATA_BIT;
+	// 8 NES buttons are normally high - all bits one
+	NES_8_BUTTONS_PORT = 0xFF;
 
-	// clock is normally high
-	SNES_CLOCK_PORT |= SNES_CLOCK_BIT;
+#if WITH_13_BUTTONS
+	// 4 NES buttons are input - those 4 bits are off
+	SNES_4_BUTTONS_DDR &= ~SNES_4_BUTTONS_MASK;
 
-	// LATCH is Active HIGH
-	SNES_LATCH_PORT &= ~(SNES_LATCH_BIT);
+	// 4 NES buttons are normally high - all bits one
+	SNES_4_BUTTONS_PORT |= SNES_4_BUTTONS_MASK;
+#endif
+
+	// home button is input
+	HOME_BUTTON_DDR &= ~(HOME_BUTTON_BIT);
+	
+	// home button is normally high
+	HOME_BUTTON_PORT |= HOME_BUTTON_BIT;
 
 	snesUpdate();
 
@@ -98,61 +102,36 @@ static char snesInit(void)
 
 /*
  *
-       Clock Cycle     Button Reported
+       Bit position     Button Reported
         ===========     ===============
-        1               B
-        2               Y
-        3               Select
-        4               Start
-        5               Up on joypad
-        6               Down on joypad
-        7               Left on joypad
-        8               Right on joypad
-        9               A
-        10              X
-        11              L
-        12              R
+        0               B
+        1               Y  (A for NES)
+        2               Select
+        3               Start
+        4               Up on joypad
+        5               Down on joypad
+        6               Left on joypad
+        7               Right on joypad
+        8               A
+        9               X
+        10              L
+        11              R
+        12              HOME
         13              none (always high)
         14              none (always high)
         15              none (always high)
-        16              none (always high)
  *
  */
 
 static char snesUpdate(void)
 {
-	int i;
 	unsigned char tmp=0;
 
-	SNES_LATCH_HIGH();
-	_delay_us(12);
-	SNES_LATCH_LOW();
-
-	for (i=0; i<8; i++)
-	{
-		_delay_us(6);
-		SNES_CLOCK_LOW();
-
-		tmp <<= 1;
-		if (!SNES_GET_DATA()) { tmp |= 0x01; }
-
-		_delay_us(6);
-
-		SNES_CLOCK_HIGH();
-	}
-	last_read_controller_bytes[0] = tmp;
-	for (i=0; i<8; i++)
-	{
-		_delay_us(6);
-
-		SNES_CLOCK_LOW();
-
-		tmp <<= 1;
-		if (!SNES_GET_DATA()) { tmp |= 0x01; }
-
-		_delay_us(6);
-		SNES_CLOCK_HIGH();
-	}
+	last_read_controller_bytes[0] = ~NES_8_BUTTONS_PIN;
+#if WITH_13_BUTTONS
+	tmp |= ((~SNES_4_BUTTONS_PIN) & SNES_4_BUTTONS_MASK) << SNES_4_BUTTONS_SHIFT;
+#endif
+	tmp |= (!(HOME_BUTTON_PIN & HOME_BUTTON_BIT)) ? HOME_BUTTON_DATA_BIT : 0;
 	last_read_controller_bytes[1] = tmp;
 
 	return 0;
@@ -173,30 +152,25 @@ static void snesGetReport(gamepad_data *dst)
 		l = last_read_controller_bytes[0];
 		h = last_read_controller_bytes[1];
 
-
-		// The 4 last bits are always high if an SNES controller
-		// is connected. With a NES controller, they are low.
-		// (High on the wire is a 0 here due to the snesUpdate() implementation)
-		//
-		if ((h & 0x0f) == 0x0f) {
-			nes_mode = 1;
-		} else {
-			nes_mode = 0;
-		}
-
-		if (nes_mode) {
-			// Nes controllers send the data in this order:
-			// A B Sel St U D L R
-			dst->nes.pad_type = PAD_TYPE_NES;
-			dst->nes.buttons = l;
-			dst->nes.raw_data[0] = l;
-		} else {
-			dst->nes.pad_type = PAD_TYPE_SNES;
-			dst->snes.buttons = l;
-			dst->snes.buttons |= h<<8;
-			dst->snes.raw_data[0] = l;
-			dst->snes.raw_data[1] = h;
-		}
+		// in this version we compile it as NES or SNES
+#if WITH_13_BUTTONS
+		nes_mode = 1;
+		dst->nes.pad_type = PAD_TYPE_SNES;
+		dst->snes.buttons = l;
+		dst->snes.buttons |= h<<8;
+		dst->snes.raw_data[0] = l;
+		dst->snes.raw_data[1] = h;
+#else
+		nes_mode = 0;
+		// Nes controllers send the data in this order:
+		// A B Sel St U D L R
+		// NA NA NA NA HOME NA NA NA
+		dst->nes.pad_type = PAD_TYPE_NES;
+		dst->nes.buttons = l;
+		dst->nes.buttons |= h<<8;
+		dst->nes.raw_data[0] = l;
+		dst->nes.raw_data[1] = h;
+#endif
 	}
 	memcpy(last_reported_controller_bytes,
 			last_read_controller_bytes,

@@ -26,7 +26,7 @@
 #define PAD_TYPE_MD			6
 #define PAD_TYPE_SMS		7
 
-#define NES_RAW_SIZE		1
+#define NES_RAW_SIZE		2
 #define SNES_RAW_SIZE		2
 #define N64_RAW_SIZE		4
 #define GC_RAW_SIZE			8
@@ -89,11 +89,12 @@ typedef struct _snes_pad_data {
 #define SNES_BTN_X			0x4000
 #define SNES_BTN_L			0x2000
 #define SNES_BTN_R			0x1000
+#define SNES_BTN_HOME		0x0800
 
 
 typedef struct _nes_pad_data {
 	unsigned char pad_type; // PAD_TYPE_NES
-	unsigned char buttons;
+	unsigned short buttons;
 	unsigned char raw_data[NES_RAW_SIZE];
 } nes_pad_data;
 
@@ -105,6 +106,7 @@ typedef struct _nes_pad_data {
 #define NES_BTN_DPAD_DOWN	0x0004
 #define NES_BTN_DPAD_LEFT	0x0002
 #define NES_BTN_DPAD_RIGHT	0x0001
+#define NES_BTN_HOME		0x0800
 
 typedef struct _n64_pad_data {
 	unsigned char pad_type; // PAD_TYPE_N64

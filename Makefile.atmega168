@@ -2,10 +2,10 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-PROGNAME=atmega168_extenmote
+PROGNAME=atmega168_open9button
 OBJDIR=objs-$(PROGNAME)
 CPU=atmega168a
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=12000000L -Os -DWITH_SNES -DWITH_N64 -DWITH_GAMECUBE -DWITH_EEPROM -DWITH_DB9
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=12000000L -Os -DWITH_SNES -DWITH_EEPROM
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=$(PROGNAME).map
 HEXFILE=$(PROGNAME).hex
 AVRDUDE=avrdude -p m168 -P usb -c avrispmkII
@@ -24,7 +24,7 @@ HFUSE=0xdf
 # 8mhz internal RC oscillator (Ok for NES/SNES only mode)
 LFUSE=0xDF
 
-OBJS=$(addprefix $(OBJDIR)/, main.o wiimote.o snes.o rlut.o n64.o gcn64_protocol.o gamecube.o eeprom.o classic.o analog.o tripleclick.o db9.o)
+OBJS=$(addprefix $(OBJDIR)/, main.o wiimote.o snes.o eeprom.o classic.o)
 
 all: $(HEXFILE)
 

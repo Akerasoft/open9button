@@ -20,18 +20,12 @@
 #include <avr/interrupt.h>
 #include <math.h>
 #include "wiimote.h"
-#include "gcn64_protocol.h"
 #include "snes.h"
-#include "n64.h"
-#include "gamecube.h"
 #include "eeprom.h"
 #include "classic.h"
 #include "analog.h"
-#include "db9.h"
 
 static unsigned char classic_id[6] = { 0x00, 0x00, 0xA4, 0x20, 0x01, 0x01 };
-static unsigned char adapter_n64_id[6] = { 0x00, 0x00, 0xA4, 0x20, 0x52, 0x64 };
-static unsigned char adapter_gc_id[6] = { 0x00, 0x00, 0xA4, 0x20, 0x52, 0x47 };
 static unsigned char adapter_snes_id[6] = { 0x00, 0x00, 0xA4, 0x20, 0x52, 0x10 };
 static unsigned char adapter_nes_id[6] = { 0x00, 0x00, 0xA4, 0x20, 0x52, 0x08 };
 
@@ -57,70 +51,36 @@ static unsigned char cal_data[32] = {
 
 static volatile char performupdate;
 
-static char db9_mode = 0;
-
 static void hwInit(void)
 {
 	/* PORTD
-	 * 0: out0
+	 * input for 8 buttons
+	 */
+	PORTD = 0xff;
+	DDRD = 0x00;
+	
+#if WITH_13_BUTTONS
+	PORTC = 0x0f;
+	DDRC = 0xc0;
+#else
+	PORTC = 0x00;
+	DDRC = 0xcf;
+#endif
+
+	/* PORTB
+	 *
+	 * 0: in1
 	 * 1: out0
 	 * 2: out0
 	 * 3: out0
-	 * 4: out1 // Tied to VCC on Multiuse PCB2 for routing reasons
+	 * 4: out0
 	 * 5: out0
-	 * 6: in-pu // Pulled to GND on mutluse db9 v3. Wired to VCC on multiuse PCB2.
+	 * 6: out0
 	 * 7: out0
+	 *
 	 */
-	PORTD = 0x60;
-	DDRD = 0xbf;
-
-	_delay_ms(1);
-
-	if (!(PIND & 0x40)) {
-		db9_mode = 1;
-	}
-
-	if (!db9_mode)
-	{
-		/* PORTC
-		 *
-		 * 0: SNES/NES CLK 		out1
-		 * 1: SNES/NES LATCH	out1
-		 * 2: SNES/NES DATA		in-pu
-		 * 3: N64/Gamecube IO	in-pu
-		 * 4: SDA (io)
-		 * 5: SCL (io)
-		 * 6: N/A
-		 * 7: N/A
-		 *
-		 * [*] Needs an external 1.5k pullup.
-		 *
-		 */
-		PORTC = 0x07;
-		DDRC = 0xc3;
-
-		/* PORTB
-		 *
-		 * 0: out0
-		 * 1: out0
-		 * 2: out0
-		 * 3: out0
-		 * 4: out0
-		 * 5: out0
-		 * 6: out0
-		 * 7: out0
-		 *
-		 */
-		PORTB = 0x00;
-		DDRB = 0xff;
-	}
-	else
-	{
-		DDRC = 0x00;
-		PORTC = 0xff;
-		DDRB = 0x00;
-		PORTB = 0xff;
-	}
+	PORTB = 0x01;
+	DDRB = 0xfd;
 }
 
 static char initial_controller = PAD_TYPE_NONE;
@@ -128,48 +88,18 @@ static char initial_controller = PAD_TYPE_NONE;
 static void do_earlyDetection()
 {
 	Gamepad *gamepad = NULL;
-	unsigned char ngc;
 	gamepad_data paddata;
 
-//			initial_controller = PAD_TYPE_N64;
-//			wm_setAltId(adapter_n64_id);
-//			return;
-#if defined(WITH_N64) || defined(WITH_GAMECUBE)
-	ngc = gcn64_detectController();
-	switch(ngc)
-	{
-		case CONTROLLER_IS_N64:
-			initial_controller = PAD_TYPE_N64;
-			wm_setAltId(adapter_n64_id);
-			return;
+	gamepad = snesGetGamepad();
+	gamepad->update();
+	gamepad->getReport(&paddata);
 
-		case CONTROLLER_IS_GC:
-			initial_controller = PAD_TYPE_GAMECUBE;
-			wm_setAltId(adapter_gc_id);
-			return;
-	}
-#endif
-
-	if (db9_mode) {
-#ifdef WITH_DB9
-		gamepad = db9GetGamepad();
-		gamepad->update();
-		gamepad->getReport(&paddata);
-#endif
+	if (paddata.pad_type == PAD_TYPE_SNES) {
+		initial_controller = PAD_TYPE_SNES;
+		wm_setAltId(adapter_snes_id);
 	} else {
-#ifdef WITH_SNES
-		gamepad = snesGetGamepad();
-		gamepad->update();
-		gamepad->getReport(&paddata);
-
-		if (paddata.pad_type == PAD_TYPE_SNES) {
-			initial_controller = PAD_TYPE_SNES;
-			wm_setAltId(adapter_snes_id);
-		} else {
-			initial_controller = PAD_TYPE_NES;
-			wm_setAltId(adapter_nes_id);
-		}
-#endif
+		initial_controller = PAD_TYPE_NES;
+		wm_setAltId(adapter_nes_id);
 	}
 }
 
@@ -184,14 +114,9 @@ static void pollfunc(void)
 #define STATE_NO_CONTROLLER		0
 #define STATE_CONTROLLER_ACTIVE	1
 
-#define N64_GC_DETECT_PERIOD	120
-
 int main(void)
 {
 	Gamepad *snes_gamepad = NULL;
-	Gamepad *n64_gamepad = NULL;
-	Gamepad *gc_gamepad	= NULL;
-	Gamepad *db9_gamepad = NULL;
 	Gamepad *cur_gamepad = NULL;
 	Gamepad *default_gamepad = NULL;
 	unsigned char mainState = STATE_NO_CONTROLLER;
@@ -205,37 +130,14 @@ int main(void)
 
 	hwInit();
 	init_config();
-#if defined(WITH_N64) || defined(WITH_GAMECUBE)
-	gcn64protocol_hwinit();
-#endif
 
-#ifdef WITH_SNES
 	snes_gamepad = snesGetGamepad();
 	default_gamepad = snes_gamepad;
-#endif
-
-#ifdef WITH_N64
-	n64_gamepad = n64GetGamepad();
-#endif
-
-#ifdef WITH_GAMECUBE
-	gc_gamepad = gamecubeGetGamepad();
-#endif
-
-#ifdef WITH_DB9
-	db9_gamepad = db9GetGamepad();
-	if (db9_mode) {
-		db9_gamepad->init();
-		default_gamepad = db9_gamepad;
-	}
-#endif
 
 	dataToClassic(NULL, &classicData, 0);
 	pack_classic_data(&classicData, current_report, ANALOG_STYLE_DEFAULT, CLASSIC_MODE_1);
 
-	if (!db9_mode) {
-		do_earlyDetection();
-	}
+	do_earlyDetection();
 
 	wm_init(classic_id, current_report, PACKED_CLASSIC_DATA_SIZE, cal_data, pollfunc);
 	wm_start();
@@ -293,29 +195,6 @@ int main(void)
 			case STATE_NO_CONTROLLER:
 				disable_config = 0;
 				first_controller_read = 1;
-#if defined(WITH_GAMECUBE) || defined(WITH_N64)
-				if (!db9_mode) {
-					detect_time++;
-					if (detect_time > N64_GC_DETECT_PERIOD)
-					{
-						detect_time = 0;
-						switch (gcn64_detectController())
-						{
-							case CONTROLLER_IS_N64:
-								cur_gamepad = n64_gamepad;
-								mainState = STATE_CONTROLLER_ACTIVE;
-								analog_style = ANALOG_STYLE_N64;
-								break;
-
-							case CONTROLLER_IS_GC:
-								cur_gamepad = gc_gamepad;
-								mainState = STATE_CONTROLLER_ACTIVE;
-								analog_style = ANALOG_STYLE_GC;
-								break;
-						}
-					}
-				}
-#endif
 				if (default_gamepad) {
 					default_gamepad->update();
 					default_gamepad->getReport(&lastReadData);
@@ -366,16 +245,6 @@ int main(void)
 
 			switch (initial_controller)
 			{
-				case PAD_TYPE_GAMECUBE:
-					memcpy(raw, lastReadData.gc.raw_data, sizeof(lastReadData.gc.raw_data));
-					wm_newaction(raw, sizeof(lastReadData.gc.raw_data));
-					break;
-
-				case PAD_TYPE_N64:
-					memcpy(raw, lastReadData.n64.raw_data, sizeof(lastReadData.n64.raw_data));
-					wm_newaction(raw, sizeof(lastReadData.n64.raw_data));
-					break;
-
 				case PAD_TYPE_SNES:
 					memcpy(raw, lastReadData.snes.raw_data, sizeof(lastReadData.snes.raw_data));
 					wm_newaction(raw, sizeof(lastReadData.snes.raw_data));

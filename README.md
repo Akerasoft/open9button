@@ -1,14 +1,19 @@
-# Extenmote: NES/SNES/N64/Gamecube/Genesis/Atari to Wiimote/NES Classic adapter firmware
+# Open9button: NES Classic controller with HOME button to Wiimote/NES Classic adapter firmware
 
-This is a firmware for using a variety of controllers on a Wii/Wii U through a Wii remote. The NES Classic edition
+This is a firmware for using a NES controller on a Wii/Wii U through a Wii remote. The NES Classic edition
 is also supported.
 
 ## Project homepage
 
-Schematics and additional information such as button mappings are available on the project homepage:
-
+This is based on Extenmote
 English: [Extenmote](http://www.raphnet.net/electronique/extenmote/index_en.php)
 French: [Extenmote](http://www.raphnet.net/electronique/extenmote/index.php)
+
+This derivative is a controller pcb board or an arcade board.
+
+Schematics and additional information such as button mappings are available on the project homepage:
+
+English: TODO
 
 ## Supported micro-controller(s)
 
@@ -35,4 +40,4 @@ This project is licensed under the terms of the GNU General Public License, vers
 ## Acknowledgments
 
 * Thanks to the authors of the [wiibrew wiki](http://wiibrew.org/wiki/Wiimote/Extension_Controllers/Classic_Controller) the excellent Wiimote accessory protocol documentation.
-
+* Thanks to [Raphaël Assenat] and his project (https://www.raphnet.net/electronique/extenmote/index_en.php) for the original work.

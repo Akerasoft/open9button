@@ -19,8 +19,6 @@
 #include "classic.h"
 #include "eeprom.h"
 #include "analog.h"
-#include "rlut.h"
-#include "tripleclick.h"
 
 #define C_DEFLECTION	100
 
@@ -65,28 +63,8 @@ void pack_classic_data_mode1(classic_pad_data *src, unsigned char dst[PACKED_CLA
 
 	memset(dst, 0x00, PACKED_CLASSIC_DATA_SIZE);
 
-	if (analog_style == ANALOG_STYLE_N64)
-	{
-		if (g_current_config.g_n64_mapping_mode != MODE_TEST) {
-#ifdef WITH_N64
-			lx = applyCurve(src->lx, g_current_config.g_n64_curve_id);
-			ly = applyCurve(src->ly, g_current_config.g_n64_curve_id);
-#endif
-		} else {
-			lx = 0x20 + src->lx;
-			ly = 0x20 + src->ly;
-		}
-
-	} else if (analog_style == ANALOG_STYLE_GC) {
-#ifdef WITH_GAMECUBE
-		lx = applyCurve(src->lx, RLUT_GC1);
-		ly = applyCurve(src->ly, RLUT_GC1);
-#endif
-	}
-	else {
-		lx = ((0x80 + src->lx) >> 2) & 0x3F;
-		ly = ((0x80 + src->ly) >> 2) & 0x3F;
-	}
+	lx = ((0x80 + src->lx) >> 2) & 0x3F;
+	ly = ((0x80 + src->ly) >> 2) & 0x3F;
 
 	rx = ((0x80 + src->rx) >> 3) & 0x1F;
 	ry = ((0x80 + src->ry) >> 3) & 0x1F;
@@ -115,21 +93,8 @@ void pack_classic_data_mode2(classic_pad_data *src, unsigned char dst[PACKED_CLA
 	memset(dst, 0x00, PACKED_CLASSIC_DATA_SIZE);
 
 
-	if (analog_style == ANALOG_STYLE_N64) {
-		// Provide a way to get the old 2.1.0 direct translation
-		if (g_current_config.g_n64_curve_id == RLUT_V1_4) {
-			lx = 0x80 + src->lx;
-			ly = 0x80 + src->ly;
-		} else {
-			// Classic controllers in this mode return -100 to +100
-			// N64 controllers are -80 to +80
-			lx = 0x80 + (src->lx * 128 / 95);
-			ly = 0x80 + (src->ly * 128 / 95);
-		}
-	} else {
-		lx = 0x80 + src->lx;
-		ly = 0x80 + src->ly;
-	}
+	lx = 0x80 + src->lx;
+	ly = 0x80 + src->ly;
 	rx = 0x80 + src->rx;
 	ry = 0x80 + src->ry;
 	shoulder_left = src->lt;
@@ -153,22 +118,8 @@ void pack_classic_data_mode3(classic_pad_data *src, unsigned char dst[PACKED_CLA
 
 	memset(dst, 0x00, PACKED_CLASSIC_DATA_SIZE);
 
-	if (analog_style == ANALOG_STYLE_N64) {
-		// Provide a way to get the old 2.1.0 direct translation
-		if (g_current_config.g_n64_curve_id == RLUT_V1_4) {
-			lx = 0x80 + src->lx;
-			ly = 0x80 + src->ly;
-		}
-		else {
-			// Classic controllers in this mode return -100 to +100
-			// N64 controllers are -80 to +80, but +/- 75 is typical
-			lx = 0x80 + (src->lx * 128 / 95);
-			ly = 0x80 + (src->ly * 128 / 95);
-		}
-	} else {
-		lx = 0x80 + src->lx;
-		ly = 0x80 + src->ly;
-	}
+	lx = 0x80 + src->lx;
+	ly = 0x80 + src->ly;
 	rx = 0x80 + src->rx;
 	ry = 0x80 + src->ry;
 
@@ -276,9 +227,10 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 				sync_config();
 			}
 
-			if (isTripleClick(src->snes.buttons & SNES_BTN_START)) {
-				dst->buttons |= CPAD_BTN_HOME;
-			}
+			//if (isTripleClick(src->snes.buttons & SNES_BTN_START)) {
+			//	dst->buttons |= CPAD_BTN_HOME;
+			//}
+			if (src->snes.buttons & SNES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
 
 			// Simulate L/R fully pressed values (like the analogue-less classic controller pro does)
 			if (dst->buttons & CPAD_BTN_TRIG_LEFT) {
@@ -307,388 +259,11 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			if (src->nes.buttons & NES_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
 			if (src->nes.buttons & NES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
 
-			if (isTripleClick(src->nes.buttons & NES_BTN_START)) {
-				dst->buttons |= CPAD_BTN_HOME;
-			}
+			//if (isTripleClick(src->nes.buttons & NES_BTN_START)) {
+			//	dst->buttons |= CPAD_BTN_HOME;
+			//}
+			if (src->nes.buttons & NES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
 
 			break;
-
-#ifdef WITH_GAMECUBE
-		case PAD_TYPE_GAMECUBE:
-			/* Raw data */
-			dst->controller_id[0] = 'G';
-			dst->controller_id[1] = 'C';
-			memcpy(dst->controller_raw_data, src->gc.raw_data, GC_RAW_SIZE);
-
-			if (first_read && src->gc.buttons & GC_BTN_START) {
-				disable_config = 1;
-			}
-
-			switch (g_current_config.g_gc_mapping_mode) {
-				case MODE_GC_STANDARD:
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_A; }
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_B; }
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_X; }
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= buttons_zl_zr; }
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					break;
-
-				case MODE_GC_SNES:
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_B; }
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_X; }
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_A; }
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= CPAD_BTN_MINUS; }
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					break;
-
-				case MODE_GC_ZLR:
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_A; }
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_B; }
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_X; }
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_ZL; }
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_ZR; }
-					break;
-
-				case MODE_GC_ASR:
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_ZR; } // Gas
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_A; } // Exchange item
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_B; } // Use item
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_X; } // ?
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= CPAD_BTN_B; }	// Use item
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_ZL; }// Break/reverse
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_Y; }	// Rear view
-					break;
-
-				case MODE_GC_DEV:
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_B; }
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_A; }
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_X; }
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= CPAD_BTN_ZR; }
-					break;
-
-				case MODE_GC_EXTRA1:
-					/* This was suggested for Super mario 3D World */
-					if (src->gc.buttons & GC_BTN_A) { dst->buttons |= CPAD_BTN_A; } // Jump/accept
-					if (src->gc.buttons & GC_BTN_B) { dst->buttons |= CPAD_BTN_X; } // Run/ability
-					if (src->gc.buttons & GC_BTN_X) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; } // Bubble
-					if (src->gc.buttons & GC_BTN_Y) { dst->buttons |= CPAD_BTN_B; } // Cancel/Change character
-					if (src->gc.buttons & GC_BTN_L) { dst->buttons |= CPAD_BTN_ZL; } // Stomp/Long jump
-					if (src->gc.buttons & GC_BTN_R) { dst->buttons |= CPAD_BTN_ZR; } // Stomp/Long jump
-					if (src->gc.buttons & GC_BTN_Z) { dst->buttons |= CPAD_BTN_MINUS; } // Stored power
-					// Main stick -> Movement
-					// C-Stick -> Camera
-					break;
-			}
-
-			if (src->gc.buttons & GC_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
-			if (src->gc.buttons & GC_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
-			if (src->gc.buttons & GC_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-			if (src->gc.buttons & GC_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
-			if (src->gc.buttons & GC_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
-
-			// Main/Left stick to classic left stick
-			dst->lx = src->gc.x;
-			dst->ly = src->gc.y;
-
-			// C-Stick/right stick to classic right stick
-			dst->rx = src->gc.cx;
-			dst->ry = src->gc.cy;
-
-			// Left/right triggers
-			dst->lt = src->gc.lt;
-			dst->rt = src->gc.rt;
-
-			if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_DPAD_UP)) {
-				chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_STANDARD);
-			}
-			else if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_DPAD_DOWN)) {
-				chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_SNES);
-			}
-			else if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_DPAD_LEFT)) {
-				chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_ZLR);
-			}
-			else if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_DPAD_RIGHT)) {
-				chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_ASR);
-			}
-			else if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_DPAD_RIGHT)) {
-				chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_ASR);
-			}
-			else if (IS_SIMULTANEOUS(src->gc.buttons, GC_BTN_A|GC_BTN_B|GC_BTN_X|GC_BTN_Y|GC_BTN_Z)) {
-				if (src->gc.cx < -64) { // A + B + X + Y + Z + C-Left
-					chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_DEV);
-				}
-
-				if (src->gc.cx > 64) { // A + B + X + Y + Z + C-Right
-					chgMap(&g_current_config.g_gc_mapping_mode, MODE_GC_EXTRA1);
-				}
-
-				/*
-				// Combo for HOME
-				if (src->gc.cy < -64) {
-					dst->buttons |= CPAD_BTN_HOME;
-				}*/
-			}
-
-			if (isTripleClick(src->gc.buttons & GC_BTN_START)) {
-				dst->buttons |= CPAD_BTN_HOME;
-			}
-
-			break;
-#endif
-
-#ifdef WITH_N64
-		case PAD_TYPE_N64:
-			dst->controller_id[0] = '6';
-			dst->controller_id[1] = '4';
-			memcpy(dst->controller_raw_data, src->n64.raw_data, N64_RAW_SIZE);
-
-			if (first_read && src->n64.buttons & N64_BTN_START) {
-				disable_config = 1;
-			}
-
-			if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_DPAD_UP)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_N64_STANDARD);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_DPAD_DOWN)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_MARIOKART64);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_DPAD_LEFT)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_OCARINA);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_DPAD_RIGHT)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_SSMB);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_C_UP)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_SIN_AND_PUNISHMENT);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_C_DOWN)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_OGRE_BATTLE);
-			}
-			else if (IS_SIMULTANEOUS(src->n64.buttons,  N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_C_LEFT)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_F_ZERO_X);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons,  N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_C_RIGHT)) {
-				chgMap(&g_current_config.g_n64_mapping_mode, MODE_YOSHI_STORY);
-			} else if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z)) {
-				if (src->n64.y < -50) { // Stick Down
-					chgMap(&g_current_config.g_n64_mapping_mode, MODE_ODYSSEY);
-				}
-			}
-
-			// Curves
-			if (!disable_config) {
-				if (IS_SIMULTANEOUS(src->n64.buttons,  N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_A)) {
-					// Default
-					g_current_config.g_n64_curve_id = RLUT_V1_5;
-					sync_config();
-				} else if (IS_SIMULTANEOUS(src->n64.buttons,  N64_BTN_L|N64_BTN_R|N64_BTN_Z|N64_BTN_B)) {
-					// Alternate
-					g_current_config.g_n64_curve_id = RLUT_V1_4;
-					sync_config();
-				}
-
-				// Toggle the old ZL+ZR behaviour
-				if (IS_SIMULTANEOUS(src->n64.buttons, N64_BTN_L|N64_BTN_R|N64_BTN_Z))
-				{
-					if (src->n64.y > +50) { // Stick Up
-						if (!waiting_release) {
-							g_current_config.merge_zl_zr = !g_current_config.merge_zl_zr;
-							sync_config();
-							waiting_release = 1;
-						}
-					}
-				} else {
-					waiting_release = 0;
-				}
-			}
-
-			if (src->n64.buttons & N64_BTN_A) { dst->buttons |= CPAD_BTN_A; }
-			if (src->n64.buttons & N64_BTN_B) { dst->buttons |= CPAD_BTN_B; }
-			if (src->n64.buttons & N64_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
-
-			if (g_current_config.g_n64_mapping_mode != MODE_TEST) {
-				if (src->n64.buttons & N64_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
-				if (src->n64.buttons & N64_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-				if (src->n64.buttons & N64_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
-				if (src->n64.buttons & N64_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
-			}
-
-			//g_current_config.g_n64_mapping_mode = MODE_TEST;
-
-			switch (g_current_config.g_n64_mapping_mode)
-			{
-				case MODE_TEST:
-				case MODE_N64_STANDARD:
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= buttons_zl_zr; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-
-					// Pushing all C directions at once sends X and Y down (wii64 menu)
-					// This is made to work only in standard mode because that is the mode
-					// suitable for wii64.
-					if (IS_SIMULTANEOUS(src->n64.buttons,
-							N64_BTN_C_RIGHT | N64_BTN_C_LEFT | N64_BTN_C_UP | N64_BTN_C_DOWN | N64_BTN_DPAD_LEFT | N64_BTN_Z)) {
-						dst->buttons |= CPAD_BTN_Y|CPAD_BTN_X;
-					}
-					break;
-				case MODE_MARIOKART64:
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= buttons_zl_zr; }
-					break;
-				case MODE_OCARINA:
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-					break;
-				case MODE_SSMB:
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= buttons_zl_zr; }
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT | CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_C_LEFT) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->n64.buttons & N64_BTN_C_DOWN) { dst->buttons |= CPAD_BTN_X; }
-					break;
-				case MODE_SIN_AND_PUNISHMENT:
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= buttons_zl_zr; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->n64.buttons & N64_BTN_C_LEFT) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->n64.buttons & N64_BTN_C_RIGHT) { dst->buttons |= CPAD_BTN_X; }
-					break;
-				case MODE_OGRE_BATTLE:
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					break;
-				case MODE_F_ZERO_X: // Mapping 6
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-					if (src->n64.buttons & N64_BTN_C_DOWN) { dst->buttons |= CPAD_BTN_X; }
-					if (src->n64.buttons & N64_BTN_C_LEFT) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->n64.buttons & N64_BTN_C_RIGHT) { dst->buttons |= buttons_zl_zr; }
-					break;
-				case MODE_YOSHI_STORY: // Mapping 7
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= buttons_zl_zr; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= CPAD_BTN_X | CPAD_BTN_Y; }
-					break;
-				case MODE_ODYSSEY: // Mapping 8
-					if (src->n64.buttons & N64_BTN_Z) { dst->buttons |= buttons_zl_zr; }
-					if (src->n64.buttons & N64_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-					if (src->n64.buttons & N64_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-
-					// Undo the AB buttons
-					dst->buttons &= ~(CPAD_BTN_B|CPAD_BTN_A);
-
-					if (src->n64.buttons & N64_BTN_A) { dst->buttons |= CPAD_BTN_B; }
-					if (src->n64.buttons & N64_BTN_B) { dst->buttons |= CPAD_BTN_Y; }
-					if (src->n64.buttons & N64_BTN_C_LEFT) { dst->buttons |= CPAD_BTN_X; }
-					if (src->n64.buttons & N64_BTN_C_DOWN) { dst->buttons |= CPAD_BTN_A; }
-
-					// anything better to do with those?
-					if (src->n64.buttons & N64_BTN_C_UP) { dst->ry = C_DEFLECTION; }
-					if (src->n64.buttons & N64_BTN_C_RIGHT) { dst->rx = C_DEFLECTION; }
-					break;
-			}
-
-			if (g_current_config.g_n64_mapping_mode != MODE_TEST)
-			{
-				switch (g_current_config.g_n64_mapping_mode)
-				{
-					case MODE_SIN_AND_PUNISHMENT:
-						// In sin and punishment, both the left and right analog sticks on the wii classic
-						// controller are used for aim. On a N64 controller, C-left and C-right are used to
-						// move. Up down are not used and we do not want accidental button presses there to
-						// mess with aiming!
-					case MODE_F_ZERO_X:
-						// In F-Zero, 3 of the C-stick directions are mapped to buttons.
-						break;
-
-					case MODE_ODYSSEY:
-						// all done above
-						break;
-
-					default:
-						if (src->n64.buttons & N64_BTN_C_UP) { dst->ry = C_DEFLECTION; }
-						if (src->n64.buttons & N64_BTN_C_DOWN) { dst->ry = -C_DEFLECTION; }
-						if (src->n64.buttons & N64_BTN_C_LEFT) { dst->rx = -C_DEFLECTION; }
-						if (src->n64.buttons & N64_BTN_C_RIGHT) { dst->rx = C_DEFLECTION; }
-				}
-			}
-			else {
-				static char active;
-				// Special test mode
-				if (src->n64.buttons & N64_BTN_C_UP) { if (!(active&1)) { test_y++; active |= 1; } } else { active &= ~1; }
-				if (src->n64.buttons & N64_BTN_C_DOWN) { if (!(active&2)) { test_y--; active |= 2; } } else { active &= ~2; }
-				if (src->n64.buttons & N64_BTN_C_LEFT) { if (!(active&4)) { test_x++; active |= 4; } } else { active &= ~4; }
-				if (src->n64.buttons & N64_BTN_C_RIGHT) { if (!(active&8)) { test_x--; active |= 8; } } else { active &= ~8; }
-			}
-
-			if (g_current_config.g_n64_mapping_mode != MODE_TEST) {
-				dst->lx = src->n64.x;
-				dst->ly = src->n64.y;
-			} else {
-				if (src->n64.buttons & N64_BTN_DPAD_UP) { dst->ly = test_y; }
-				if (src->n64.buttons & N64_BTN_DPAD_DOWN) { dst->ly = -test_y; }
-				if (src->n64.buttons & N64_BTN_DPAD_LEFT) { dst->lx = test_x; }
-				if (src->n64.buttons & N64_BTN_DPAD_RIGHT) { dst->lx = -test_x; }
-			}
-
-			if (isTripleClick(src->n64.buttons & N64_BTN_START)) {
-				dst->buttons |= CPAD_BTN_HOME;
-			}
-
-			// Simulate L/R fully pressed values (like the analogue-less classic controller pro does)
-			if (dst->buttons & CPAD_BTN_TRIG_LEFT) {
-				dst->lt = 0xff;
-			}
-			if (dst->buttons & CPAD_BTN_TRIG_RIGHT) {
-				dst->rt = 0xff;
-			}
-
-			/*
-			if (src->n64.buttons & N64_BTN_C_UP) { 	dst->ly = 100; 		}
-			if (src->n64.buttons & N64_BTN_C_DOWN) { 	dst->ly = -100; 		}
-			if (src->n64.buttons & N64_BTN_C_LEFT) { 	dst->lx = -100; 		}
-			if (src->n64.buttons & N64_BTN_C_RIGHT) { 	dst->lx = 100; 		}
-			*/
-			break;
-#endif
-
-#ifdef WITH_DB9
-		case PAD_TYPE_SMS:
-			if (src->db9.buttons & DB9_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
-			if (src->db9.buttons & DB9_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-			if (src->db9.buttons & DB9_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
-			if (src->db9.buttons & DB9_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
-
-			if (src->db9.buttons & DB9_BTN_1) { dst->buttons |= CPAD_BTN_B; }
-			if (src->db9.buttons & DB9_BTN_2) { dst->buttons |= CPAD_BTN_A; }
-			break;
-
-		case PAD_TYPE_MD:
-			if (src->db9.buttons & DB9_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
-			if (src->db9.buttons & DB9_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
-			if (src->db9.buttons & DB9_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
-			if (src->db9.buttons & DB9_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
-
-			if (src->db9.buttons & DB9_BTN_A) { dst->buttons |= CPAD_BTN_Y; }
-			if (src->db9.buttons & DB9_BTN_B) { dst->buttons |= CPAD_BTN_B; }
-			if (src->db9.buttons & DB9_BTN_C) { dst->buttons |= CPAD_BTN_A; }
-			if (src->db9.buttons & DB9_BTN_X) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
-			if (src->db9.buttons & DB9_BTN_Y) { dst->buttons |= CPAD_BTN_X; }
-			if (src->db9.buttons & DB9_BTN_Z) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
-			if (src->db9.buttons & DB9_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
-			if (src->db9.buttons & DB9_BTN_MODE) { dst->buttons |= CPAD_BTN_ZR; }
-
-			if (isTripleClick(src->db9.buttons & DB9_BTN_START)) {
-				dst->buttons |= CPAD_BTN_HOME;
-			}
-			break;
-#endif
 	}
 }
