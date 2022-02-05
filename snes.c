@@ -40,16 +40,16 @@
 #define NES_8_BUTTONS_PORT PORTD
 #define NES_8_BUTTONS_PIN  PIND
 
-#define SNES_4_BUTTONS_DDR   DDRC
-#define SNES_4_BUTTONS_PORT  PORTC
-#define SNES_4_BUTTONS_PIN   PINC
-#define SNES_4_BUTTONS_MASK  0xF
-#define SNES_4_BUTTONS_SHIFT 4
+#define SNES_5_BUTTONS_DDR   DDRB
+#define SNES_5_BUTTONS_PORT  PORTB
+#define SNES_5_BUTTONS_PIN   PINB
+#define SNES_5_BUTTONS_MASK  0x1F
+#define SNES_5_BUTTONS_SHIFT 3
 
 #define HOME_BUTTON_PORT   PORTB
 #define HOME_BUTTON_DDR    DDRB
 #define HOME_BUTTON_PIN    PINB
-#define HOME_BUTTON_BIT    (1<<0)
+#define HOME_BUTTON_BIT    (1<<4)
 
 #define HOME_BUTTON_DATA_BIT (1<<4)
 
@@ -79,18 +79,18 @@ static char snesInit(void)
 	NES_8_BUTTONS_PORT = 0xFF;
 
 #if WITH_13_BUTTONS
-	// 4 NES buttons are input - those 4 bits are off
-	SNES_4_BUTTONS_DDR &= ~SNES_4_BUTTONS_MASK;
+	// 5 NES buttons are input - those 4 bits are off
+	SNES_5_BUTTONS_DDR &= ~SNES_5_BUTTONS_MASK;
 
-	// 4 NES buttons are normally high - all bits one
-	SNES_4_BUTTONS_PORT |= SNES_4_BUTTONS_MASK;
-#endif
-
+	// 5 NES buttons are normally high - all bits one
+	SNES_5_BUTTONS_PORT |= SNES_5_BUTTONS_MASK;
+#else
 	// home button is input
 	HOME_BUTTON_DDR &= ~(HOME_BUTTON_BIT);
 	
 	// home button is normally high
 	HOME_BUTTON_PORT |= HOME_BUTTON_BIT;
+#endif
 
 	snesUpdate();
 
@@ -129,9 +129,10 @@ static char snesUpdate(void)
 
 	last_read_controller_bytes[0] = ~NES_8_BUTTONS_PIN;
 #if WITH_13_BUTTONS
-	tmp |= ((~SNES_4_BUTTONS_PIN) & SNES_4_BUTTONS_MASK) << SNES_4_BUTTONS_SHIFT;
-#endif
+	tmp |= ((~SNES_5_BUTTONS_PIN) & SNES_5_BUTTONS_MASK) << SNES_5_BUTTONS_SHIFT;
+#else
 	tmp |= (!(HOME_BUTTON_PIN & HOME_BUTTON_BIT)) ? HOME_BUTTON_DATA_BIT : 0;
+#endif
 	last_read_controller_bytes[1] = tmp;
 
 	return 0;
@@ -188,4 +189,3 @@ Gamepad *snesGetGamepad(void)
 {
 	return &SnesGamepad;
 }
-

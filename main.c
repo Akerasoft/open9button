@@ -59,28 +59,23 @@ static void hwInit(void)
 	PORTD = 0xff;
 	DDRD = 0x00;
 	
-#if WITH_13_BUTTONS
-	PORTC = 0x0f;
+	PORTC = 0x01;
 	DDRC = 0xc0;
-#else
-	PORTC = 0x00;
-	DDRC = 0xcf;
-#endif
 
 	/* PORTB
 	 *
-	 * 0: in1
-	 * 1: out0
-	 * 2: out0
-	 * 3: out0
-	 * 4: out0
-	 * 5: out0
-	 * 6: out0
-	 * 7: out0
+	 * 0: in1 - SNES uses
+	 * 1: in1 - SNES uses
+	 * 2: in1 - SNES uses
+	 * 3: in1 - SNES uses
+	 * 4: in1 - always - used for home
+	 * 5: in1 - ignored - different design could use this one
+	 * 6: out0 - crystal
+	 * 7: out0 - crystal
 	 *
 	 */
-	PORTB = 0x01;
-	DDRB = 0xfd;
+	PORTB = 0x3f;
+	DDRB = 0x00;
 }
 
 static char initial_controller = PAD_TYPE_NONE;
