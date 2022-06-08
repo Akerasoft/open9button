@@ -2,10 +2,10 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-PROGNAME=atmega168_open9button
+PROGNAME=atmega168_open13button
 OBJDIR=objs-$(PROGNAME)
 CPU=atmega168a
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=8000000L -Os -DWITH_SNES -DWITH_EEPROM
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=8000000L -Os -DWITH_SNES -DWITH_13_BUTTONS -DWITH_EEPROM
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=$(PROGNAME).map
 HEXFILE=$(PROGNAME).hex
 AVRDUDE=avrdude -p m168 -P usb -c avrispmkII
