@@ -23,7 +23,8 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * The author may be contacted at raph@raphnet.net
+ * The original author may be contacted at raph@raphnet.net
+ * The author for changes is robert.kolski@akerasoft.com
  */
 #include <avr/io.h>
 #include <avr/interrupt.h>
