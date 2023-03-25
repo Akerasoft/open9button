@@ -41,11 +41,22 @@
 #define NES_8_BUTTONS_PORT PORTD
 #define NES_8_BUTTONS_PIN  PIND
 
+#define CLSC_7_BUTTONS_DDR   DDRB
+#define CLSC_7_BUTTONS_PORT  PORTB
+#define CLSC_7_BUTTONS_PIN   PINB
+#define CLSC_7_BUTTONS_MASK  0xFE
+
 #define SNES_5_BUTTONS_DDR   DDRB
 #define SNES_5_BUTTONS_PORT  PORTB
 #define SNES_5_BUTTONS_PIN   PINB
 #define SNES_5_BUTTONS_MASK  0x1F
 #define SNES_5_BUTTONS_SHIFT 3
+
+#define SNES_4_BUTTONS_DDR   DDRB
+#define SNES_4_BUTTONS_PORT  PORTB
+#define SNES_4_BUTTONS_PIN   PINB
+#define SNES_4_BUTTONS_MASK  0x0F
+#define SNES_4_BUTTONS_SHIFT 4
 
 #define HOME_BUTTON_PORT   PORTB
 #define HOME_BUTTON_DDR    DDRB
@@ -79,18 +90,32 @@ static char snesInit(void)
 	// 8 NES buttons are normally high - all bits one
 	NES_8_BUTTONS_PORT = 0xFF;
 
-#if WITH_13_BUTTONS
-	// 5 NES buttons are input - those 4 bits are off
+#if WITH_15_BUTTONS
+	// 7 classic buttons are input - those 7 bits are off
+	CLSC_7_BUTTONS_DDR &= ~CLSC_7_BUTTONS_MASK;
+
+	// 7 classic buttons are normally high - all bits one
+	CLSC_7_BUTTONS_PORT |= CLSC_7_BUTTONS_MASK;
+#elif WITH_13_BUTTONS
+	// 5 SNES buttons are input - those 5 bits are off
 	SNES_5_BUTTONS_DDR &= ~SNES_5_BUTTONS_MASK;
 
-	// 5 NES buttons are normally high - all bits one
+	// 5 SNES buttons are normally high - all bits one
 	SNES_5_BUTTONS_PORT |= SNES_5_BUTTONS_MASK;
-#else
+#elif WITH_12_BUTTONS
+	// 4 SNES buttons are input - those 4 bits are off
+	SNES_4_BUTTONS_DDR &= ~SNES_4_BUTTONS_MASK;
+
+	// 4 SNES buttons are normally high - all bits one
+	SNES_4_BUTTONS_PORT |= SNES_4_BUTTONS_MASK;
+#elif WITH_9_BUTTONS
 	// home button is input
 	HOME_BUTTON_DDR &= ~(HOME_BUTTON_BIT);
 	
 	// home button is normally high
 	HOME_BUTTON_PORT |= HOME_BUTTON_BIT;
+#else
+	// for 8 buttons there is no home button
 #endif
 
 	snesUpdate();
@@ -119,8 +144,19 @@ static char snesInit(void)
         11              R                         NA                         PB0
         12              HOME                      Home                       PB4
         13              none (always high)        NA                         PB5 (not used)
-        14              none (always high)        NA                         XTAL1 (so ignored)
-        15              none (always high)        NA                         XTAL2 (so ignored)
+        14              none (always high)        NA                         PB6 (so ignored)
+        15              none (always high)        NA                         PB7 (so ignored)
+	
+// 15 button design	
+        8               A                         NA                         PB7 (crystal cannot be used)
+        9               X                         NA                         PB6 (crystal cannot be used)
+        10              L                         NA                         PB5
+        11              R                         NA                         PB4
+        12              HOME                      Home                       PB3
+        13              ZL                        NA                         PB2
+        14              ZR                        NA                         PB1
+        15              none (always high)        NA                         PB0 (unused)
+
  *
  */
  
@@ -134,26 +170,48 @@ static char snesUpdate(void)
 	unsigned char tmp=0;
 	unsigned char tmpraw=0;
 
-#if WITH_13_BUTTONS
+#if WITH_15_BUTTONS
+	tmpraw = ~NES_8_BUTTONS_PIN;
+    tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
+	last_read_controller_bytes[0] = tmpraw;
+	tmp = ((~CLSC_7_BUTTONS_PIN) & CLSC_7_BUTTONS_MASK);
+#elif WITH_13_BUTTONS
 	tmpraw = ~NES_8_BUTTONS_PIN;
     tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
 	last_read_controller_bytes[0] = tmpraw;
 	tmpraw = ((~SNES_5_BUTTONS_PIN) & SNES_5_BUTTONS_MASK);
-	tmp = (tmpraw << 4) & 0xF0;
-      if ((tmpraw & (1<<4)))
+	// 4 buttons shift is correct here
+	tmp = (tmpraw << SNES_4_BUTTONS_SHIFT) & 0xF0;
+      // home is handled here
+	  if ((tmpraw & HOME_BUTTON_BIT))
       {
-          tmp |= (1<<3);
+          tmp |= HOME_BUTTON_DATA_BIT;
       }
-#else
+#elif WITH_12_BUTTONS
 	tmpraw = ~NES_8_BUTTONS_PIN;
     tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
-	tmp = tmpraw & 0x3F;
+	last_read_controller_bytes[0] = tmpraw;
+	tmpraw = ((~SNES_4_BUTTONS_PIN) & SNES_4_BUTTONS_MASK);
+	tmp = (tmpraw << SNES_4_BUTTONS_SHIFT) & 0xF0;
+#elif WITH_9_BUTTONS
+	tmpraw = ~NES_8_BUTTONS_PIN;
+    tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
+	//tmp = tmpraw & 0x3F;
     // A and B were transposed in schematic.
 	// See comment about mistake
-	if (tmpraw & (1<<7)) { tmp |= (1<<6); }
-	if (tmpraw & (1<<6)) { tmp |= (1<<7); }
-	last_read_controller_bytes[0] = tmp;
+	//if (tmpraw & (1<<7)) { tmp |= (1<<6); }
+	//if (tmpraw & (1<<6)) { tmp |= (1<<7); }
+	//last_read_controller_bytes[0] = tmp;
+	last_read_controller_bytes[0] = tmpraw;
 	tmp = ((~HOME_BUTTON_PIN & HOME_BUTTON_BIT)) ? HOME_BUTTON_DATA_BIT : 0;
+#else
+	// 8 buttons
+	tmpraw = ~NES_8_BUTTONS_PIN;
+    tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
+	last_read_controller_bytes[0] = tmpraw;
+	// a real NES authentic controller would read 0 (GND) and is inverted
+	// so you would get 0xFF here
+	tmp = 0xFF;
 #endif
 	last_read_controller_bytes[1] = tmp;
 
@@ -176,15 +234,29 @@ static void snesGetReport(gamepad_data *dst)
 		h = last_read_controller_bytes[1];
 
 		// in this version we compile it as NES or SNES
-#if WITH_13_BUTTONS
-		nes_mode = 1;
+#if WITH_15_BUTTONS
+		nes_mode = 0;
+		dst->nes.pad_type = PAD_TYPE_CLASSIC;
+		dst->snes.buttons = l;
+		dst->snes.buttons |= h<<8;
+		dst->snes.raw_data[0] = l;
+		dst->snes.raw_data[1] = h;
+#elif WITH_13_BUTTONS
+		nes_mode = 0;
 		dst->nes.pad_type = PAD_TYPE_SNES;
 		dst->snes.buttons = l;
 		dst->snes.buttons |= h<<8;
 		dst->snes.raw_data[0] = l;
 		dst->snes.raw_data[1] = h;
-#else
+#elif WITH_12_BUTTONS
 		nes_mode = 0;
+		dst->nes.pad_type = PAD_TYPE_SNES;
+		dst->snes.buttons = l;
+		dst->snes.buttons |= h<<8;
+		dst->snes.raw_data[0] = l;
+		dst->snes.raw_data[1] = h;
+#elif WITH_9_BUTTONS
+		nes_mode = 1;
 		// Nes controllers send the data in this order:
 		// A B Sel St U D L R
 		// NA NA NA NA HOME NA NA NA
@@ -193,6 +265,15 @@ static void snesGetReport(gamepad_data *dst)
 		dst->nes.buttons |= h<<8;
 		dst->nes.raw_data[0] = l;
 		dst->nes.raw_data[1] = h;
+#else
+		// 8 buttons
+		nes_mode = 1;
+		// Nes controllers send the data in this order:
+		// A B Sel St U D L R
+		// NA NA NA NA HOME NA NA NA
+		dst->nes.pad_type = PAD_TYPE_NES;
+		dst->nes.buttons = l;
+		dst->nes.raw_data[0] = l;
 #endif
 	}
 	memcpy(last_reported_controller_bytes,

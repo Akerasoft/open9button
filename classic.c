@@ -158,7 +158,7 @@ void pack_classic_data(classic_pad_data *src, unsigned char dst[PACKED_CLASSIC_D
 void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_read)
 {
 	static char test_x = 0, test_y = 0;
-	unsigned short buttons_zl_zr = CPAD_BTN_ZR;
+	//unsigned short buttons_zl_zr = CPAD_BTN_ZR;
 	static char waiting_release = 0;
 
 	// Prior to version 2.1.1, whenever the button mapping called for Z being pressed
@@ -168,26 +168,72 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 	// But in Super Smash Bros Ultimate on the Switch through the 8BitDo GBros.,
 	// it has been observed that one cannot roll when both Z triggers are down. So starting
 	// with version 2.1.1, only ZR is used.
-	if (g_current_config.merge_zl_zr) {
-		buttons_zl_zr |= CPAD_BTN_ZL;
-	}
+	//if (g_current_config.merge_zl_zr) {
+	//	buttons_zl_zr |= CPAD_BTN_ZL;
+	//}
 
 	memset(dst, 0, sizeof(classic_pad_data));
 	
-#if WITH_13_BUTTONS
+#if WITH_15_BUTTONS
+            // try CL for classic, if it does not work try GC instead.
+			dst->controller_id[0] = 'C';
+			dst->controller_id[1] = 'L';
+			memcpy(dst->controller_raw_data, src->classic.controller_raw_data, 8);
+
+			if (src->classic.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_B; }
+			if (src->classic.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
+			if (src->classic.buttons & SNES_BTN_A) { dst->buttons |= CPAD_BTN_A; }
+			if (src->classic.buttons & SNES_BTN_X) { dst->buttons |= CPAD_BTN_X; }
+
+			// analog sticks
+			dst->ly = src->classic.ly;
+			dst->lx = src->classic.lx;
+			dst->ry = src->classic.ry;
+			dst->rx = src->classic.rx;
+
+			// dpad
+			if (src->classic.buttons & SNES_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
+			if (src->classic.buttons & SNES_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
+			if (src->classic.buttons & SNES_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
+			if (src->classic.buttons & SNES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
+
+			if (src->classic.buttons & SNES_BTN_SELECT) { dst->buttons |= CPAD_BTN_MINUS; }
+			if (src->classic.buttons & SNES_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
+			if (src->classic.buttons & SNES_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
+			if (src->classic.buttons & SNES_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
+			
+			// fake mapping
+			if (src->classic.buttons & SNES_BTN_ZL) { dst->buttons |= CPAD_BTN_ZL; }
+			if (src->classic.buttons & SNES_BTN_ZR) { dst->buttons |= CPAD_BTN_ZR; }
+
+			if (src->snes.buttons & SNES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
+
+#if WITH_ANALOG_TRIGGERS
+			dst->lt = src->classic.lt;
+			dst->rt = src->classic.rt;
+#else
+			// Simulate L/R fully pressed values (like the analogue-less classic controller pro does)
+			if (dst->buttons & CPAD_BTN_TRIG_LEFT) {
+				dst->lt = 0xff;
+			}
+			if (dst->buttons & CPAD_BTN_TRIG_RIGHT) {
+				dst->rt = 0xff;
+			}
+#endif
+#elif WITH_13_BUTTONS
 			dst->controller_id[0] = 'S';
 			dst->controller_id[1] = 'F';
 			memcpy(dst->controller_raw_data, src->snes.raw_data, SNES_RAW_SIZE);
 
-			//if (g_current_config.g_snes_nes_mode) {
-			//	if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_B; }
-			//	if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_A; }
-			//} else {
+			if (g_current_config.g_snes_nes_mode) {
+				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_B; }
+				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_A; }
+			} else {
 				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_B; }
 				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
 				if (src->snes.buttons & SNES_BTN_A) { dst->buttons |= CPAD_BTN_A; }
 				if (src->snes.buttons & SNES_BTN_X) { dst->buttons |= CPAD_BTN_X; }
-			//}
+			}
 
 			if (g_current_config.g_snes_analog_dpad) {
 				if (src->snes.buttons & SNES_BTN_DPAD_UP) { dst->ly = 100; }
@@ -211,20 +257,17 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 				g_current_config.g_snes_analog_dpad = 0;
 				sync_config();
 			}
-//			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_DOWN)) {
-//				g_current_config.g_snes_nes_mode = 1;
-//				g_current_config.g_snes_analog_dpad = 0;
-//				sync_config();
-//			}
+			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_DOWN)) {
+				g_current_config.g_snes_nes_mode = 1;
+				g_current_config.g_snes_analog_dpad = 0;
+				sync_config();
+			}
 			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_LEFT)) {
 				g_current_config.g_snes_analog_dpad = 1;
 				g_current_config.g_snes_nes_mode = 0;
 				sync_config();
 			}
 
-			//if (isTripleClick(src->snes.buttons & SNES_BTN_START)) {
-			//	dst->buttons |= CPAD_BTN_HOME;
-			//}
 			if (src->snes.buttons & SNES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
 
 			// Simulate L/R fully pressed values (like the analogue-less classic controller pro does)
@@ -234,12 +277,66 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			if (dst->buttons & CPAD_BTN_TRIG_RIGHT) {
 				dst->rt = 0xff;
 			}
-#else
+#elif WITH_12_BUTTONS
+			dst->controller_id[0] = 'S';
+			dst->controller_id[1] = 'F';
+			memcpy(dst->controller_raw_data, src->snes.raw_data, SNES_RAW_SIZE);
 
-//			if (first_read && src->nes.buttons & NES_BTN_START) {
-//				disable_config = 1;
-//			}
+			if (g_current_config.g_snes_nes_mode) {
+				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_B; }
+				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_A; }
+			} else {
+				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_B; }
+				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
+				if (src->snes.buttons & SNES_BTN_A) { dst->buttons |= CPAD_BTN_A; }
+				if (src->snes.buttons & SNES_BTN_X) { dst->buttons |= CPAD_BTN_X; }
+			}
 
+			if (g_current_config.g_snes_analog_dpad) {
+				if (src->snes.buttons & SNES_BTN_DPAD_UP) { dst->ly = 100; }
+				if (src->snes.buttons & SNES_BTN_DPAD_DOWN) { dst->ly = -100; }
+				if (src->snes.buttons & SNES_BTN_DPAD_LEFT) { dst->lx = -100; }
+				if (src->snes.buttons & SNES_BTN_DPAD_RIGHT) { dst->lx = 100; }
+			} else {
+				if (src->snes.buttons & SNES_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
+				if (src->snes.buttons & SNES_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
+				if (src->snes.buttons & SNES_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
+				if (src->snes.buttons & SNES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
+			}
+
+			if (src->snes.buttons & SNES_BTN_SELECT) { dst->buttons |= CPAD_BTN_MINUS; }
+			if (src->snes.buttons & SNES_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
+			if (src->snes.buttons & SNES_BTN_L) { dst->buttons |= CPAD_BTN_TRIG_LEFT; }
+			if (src->snes.buttons & SNES_BTN_R) { dst->buttons |= CPAD_BTN_TRIG_RIGHT; }
+
+			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_UP)) {
+				g_current_config.g_snes_nes_mode = 0;
+				g_current_config.g_snes_analog_dpad = 0;
+				sync_config();
+			}
+			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_DOWN)) {
+				g_current_config.g_snes_nes_mode = 1;
+				g_current_config.g_snes_analog_dpad = 0;
+				sync_config();
+			}
+			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_LEFT)) {
+				g_current_config.g_snes_analog_dpad = 1;
+				g_current_config.g_snes_nes_mode = 0;
+				sync_config();
+			}
+
+			if (isTripleClick(src->snes.buttons & SNES_BTN_START)) {
+				dst->buttons |= CPAD_BTN_HOME;
+			}
+
+			// Simulate L/R fully pressed values (like the analogue-less classic controller pro does)
+			if (dst->buttons & CPAD_BTN_TRIG_LEFT) {
+				dst->lt = 0xff;
+			}
+			if (dst->buttons & CPAD_BTN_TRIG_RIGHT) {
+				dst->rt = 0xff;
+			}
+#elif WITH_9_BUTTONS
 			dst->controller_id[0] = 'F';
 			dst->controller_id[1] = 'C';
 			memcpy(dst->controller_raw_data, src->nes.raw_data, NES_RAW_SIZE);
@@ -253,9 +350,24 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			if (src->nes.buttons & NES_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
 			if (src->nes.buttons & NES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
 
-			//if (isTripleClick(src->nes.buttons & NES_BTN_START)) {
-			//	dst->buttons |= CPAD_BTN_HOME;
-			//}
 			if (src->nes.buttons & NES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
+#else
+			// 8 buttons
+			dst->controller_id[0] = 'F';
+			dst->controller_id[1] = 'C';
+			memcpy(dst->controller_raw_data, src->nes.raw_data, NES_RAW_SIZE);
+
+			if (src->nes.buttons & NES_BTN_A) { dst->buttons |= CPAD_BTN_A; }
+			if (src->nes.buttons & NES_BTN_B) { dst->buttons |= CPAD_BTN_B; }
+			if (src->nes.buttons & NES_BTN_SELECT) { dst->buttons |= CPAD_BTN_MINUS; }
+			if (src->nes.buttons & NES_BTN_START) { dst->buttons |= CPAD_BTN_PLUS; }
+			if (src->nes.buttons & NES_BTN_DPAD_UP) { dst->buttons |= CPAD_BTN_DPAD_UP; }
+			if (src->nes.buttons & NES_BTN_DPAD_DOWN) { dst->buttons |= CPAD_BTN_DPAD_DOWN; }
+			if (src->nes.buttons & NES_BTN_DPAD_LEFT) { dst->buttons |= CPAD_BTN_DPAD_LEFT; }
+			if (src->nes.buttons & NES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
+
+			if (isTripleClick(src->nes.buttons & NES_BTN_START)) {
+				dst->buttons |= CPAD_BTN_HOME;
+			}
 #endif
 }

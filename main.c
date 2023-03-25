@@ -20,7 +20,11 @@
 #include <avr/interrupt.h>
 #include <math.h>
 #include "wiimote.h"
+#if WITH_15_BUTTON
+#include "clsc.h"
+#else
 #include "snes.h"
+#endif
 #include "eeprom.h"
 #include "classic.h"
 #include "analog.h"
@@ -70,30 +74,17 @@ static void hwInit(void)
 	 * 3: in1 - SNES uses
 	 * 4: in1 - always - used for home
 	 * 5: in1 - ignored - different design could use this one
-	 * 6: out0 - crystal
-	 * 7: out0 - crystal
+	 * 6: in1 - biggerpad
+	 * 7: in1 - biggerpad
 	 *
 	 */
-	PORTB = 0x3f;
+	//PORTB = 0x3f;
+	//DDRB = 0x00;
+	
+	// change to no crystal
+	PORTB = 0xff;
 	DDRB = 0x00;
 }
-
-//static void do_earlyDetection()
-//{
-//	Gamepad *gamepad = NULL;
-//	gamepad_data paddata;
-
-//	gamepad = snesGetGamepad();
-//	gamepad->update();
-//	gamepad->getReport(&paddata);
-
-//	if (paddata.pad_type == PAD_TYPE_SNES) {
-//		wm_setAltId(adapter_snes_id);
-//	} else {
-//		wm_setAltId(adapter_nes_id);
-//	}
-//}
-
 
 static void pollfunc(void)
 {
@@ -107,7 +98,11 @@ static void pollfunc(void)
 
 int main(void)
 {
+#if WITH_15_BUTTONS
+	Gamepad *clsc_gamepad = NULL;
+#else
 	Gamepad *snes_gamepad = NULL;
+#endif
 	unsigned char analog_style = ANALOG_STYLE_DEFAULT;
 	gamepad_data lastReadData;
 	classic_pad_data classicData;
@@ -119,18 +114,27 @@ int main(void)
 	hwInit();
 	init_config();
 
+#if WITH_15_BUTTONS
+	clsc_gamepad = clscGetGamepad();
+#else
 	snes_gamepad = snesGetGamepad();
+#endif
 
 	dataToClassic(NULL, &classicData, 0);
 	pack_classic_data(&classicData, current_report, ANALOG_STYLE_DEFAULT, CLASSIC_MODE_1);
 
-//#if WITH_13_BUTTON
-//		wm_setAltId(adapter_snes_id);
-//#else		
-//		wm_setAltId(adapter_nes_id);
-//#endif
-	
-	//do_earlyDetection();
+#if WITH_15_BUTTONS
+ 		// no alt id
+#elif WITH_13_BUTTONS
+		wm_setAltId(adapter_snes_id);
+#elif WITH_12_BUTTONS
+		wm_setAltId(adapter_snes_id);
+#elif WITH_9_BUTTONS
+		wm_setAltId(adapter_nes_id);
+#else		
+		// 8 button is implied
+		wm_setAltId(adapter_nes_id);
+#endif
 
 	wm_init(classic_id, current_report, PACKED_CLASSIC_DATA_SIZE, cal_data, pollfunc);
 	wm_start();
@@ -141,10 +145,10 @@ int main(void)
 		// Adapter without sleep: 4mA
 		// Adapter with sleep: 1.6mA
 
-		//set_sleep_mode(SLEEP_MODE_EXT_STANDBY);
-		//sleep_enable();
-		//sleep_cpu();
-		//sleep_disable();
+		set_sleep_mode(SLEEP_MODE_EXT_STANDBY);
+		sleep_enable();
+		sleep_cpu();
+		sleep_disable();
 
 		while (!performupdate) { }
 		performupdate = 0;
@@ -160,7 +164,7 @@ int main(void)
 		//
 		// This is why I chose to maintain a margin.
 		//
-		//_delay_ms(2.35); // delay A
+		_delay_ms(2.35); // delay A
 
 		//                                        |<----------- E ----------->|
 		//                               C  -->|  |<--
@@ -179,9 +183,15 @@ int main(void)
 		// E = 2.34ms (menu), 2.84ms (in game)
 		//
 
+#if WITH_15_BUTTONS
+		clsc_gamepad = clscGetGamepad();
+		clsc_gamepad->update();
+		clsc_gamepad->getReport(&lastReadData);
+#else
 		snes_gamepad = snesGetGamepad();
 		snes_gamepad->update();
 		snes_gamepad->getReport(&lastReadData);
+#endif
 
 		if (!wm_altIdEnabled())
 		{
@@ -203,10 +213,20 @@ int main(void)
 		{
 			unsigned char raw[8];
 
-#if WITH_13_BUTTON
+#if WITH_15_BUTTONS
+				memcpy(raw, lastReadData.classic.controller_raw_data, sizeof(lastReadData.classic.controller_raw_data));
+				wm_newaction(raw, sizeof(lastReadData.classic.controller_raw_data));
+#elif WITH_13_BUTTONS
 				memcpy(raw, lastReadData.snes.raw_data, sizeof(lastReadData.snes.raw_data));
 				wm_newaction(raw, sizeof(lastReadData.snes.raw_data));
+#elif WITH_12_BUTTONS
+				memcpy(raw, lastReadData.snes.raw_data, sizeof(lastReadData.snes.raw_data));
+				wm_newaction(raw, sizeof(lastReadData.snes.raw_data));
+#elif WITH_9_BUTTONS
+				memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
+				wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
 #else
+				// 8 button
 				memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
 				wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
 #endif

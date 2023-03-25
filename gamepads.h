@@ -26,7 +26,12 @@
 #define PAD_TYPE_MD			6
 #define PAD_TYPE_SMS		7
 
+#if WITH_9_BUTTON
 #define NES_RAW_SIZE		2
+#else
+// 8 button has 1 byte of data
+#define NES_RAW_SIZE		1	
+#endif
 #define SNES_RAW_SIZE		2
 #define N64_RAW_SIZE		4
 #define GC_RAW_SIZE			8
@@ -70,7 +75,6 @@ typedef struct _classic_pad_data {
 #define CPAD_BTN_ZL			0x0080
 #define CPAD_BTN_ZR			0x0004
 
-
 typedef struct _snes_pad_data {
 	unsigned char pad_type; // PAD_TYPE_SNES
 	unsigned short buttons;
@@ -91,6 +95,9 @@ typedef struct _snes_pad_data {
 #define SNES_BTN_R			0x1000
 #define SNES_BTN_HOME		0x0800
 
+// fake see classic reading
+#define SNES_BTN_ZL			0x0400
+#define SNES_BTN_ZR			0x0200
 
 typedef struct _nes_pad_data {
 	unsigned char pad_type; // PAD_TYPE_NES
