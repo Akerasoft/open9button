@@ -124,11 +124,11 @@ int main(void)
 	dataToClassic(NULL, &classicData, 0);
 	pack_classic_data(&classicData, current_report, ANALOG_STYLE_DEFAULT, CLASSIC_MODE_1);
 
-#if WITH_13_BUTTON
-		wm_setAltId(adapter_snes_id);
-#else		
-		wm_setAltId(adapter_nes_id);
-#endif
+//#if WITH_13_BUTTON
+//		wm_setAltId(adapter_snes_id);
+//#else		
+//		wm_setAltId(adapter_nes_id);
+//#endif
 	
 	//do_earlyDetection();
 
