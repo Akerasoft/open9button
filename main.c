@@ -78,25 +78,21 @@ static void hwInit(void)
 	DDRB = 0x00;
 }
 
-static char initial_controller = PAD_TYPE_NONE;
+//static void do_earlyDetection()
+//{
+//	Gamepad *gamepad = NULL;
+//	gamepad_data paddata;
 
-static void do_earlyDetection()
-{
-	Gamepad *gamepad = NULL;
-	gamepad_data paddata;
+//	gamepad = snesGetGamepad();
+//	gamepad->update();
+//	gamepad->getReport(&paddata);
 
-	gamepad = snesGetGamepad();
-	gamepad->update();
-	gamepad->getReport(&paddata);
-
-	if (paddata.pad_type == PAD_TYPE_SNES) {
-		initial_controller = PAD_TYPE_SNES;
-		wm_setAltId(adapter_snes_id);
-	} else {
-		initial_controller = PAD_TYPE_NES;
-		wm_setAltId(adapter_nes_id);
-	}
-}
+//	if (paddata.pad_type == PAD_TYPE_SNES) {
+//		wm_setAltId(adapter_snes_id);
+//	} else {
+//		wm_setAltId(adapter_nes_id);
+//	}
+//}
 
 
 static void pollfunc(void)
@@ -112,9 +108,6 @@ static void pollfunc(void)
 int main(void)
 {
 	Gamepad *snes_gamepad = NULL;
-	Gamepad *cur_gamepad = NULL;
-	Gamepad *default_gamepad = NULL;
-	unsigned char mainState = STATE_CONTROLLER_ACTIVE;
 	unsigned char analog_style = ANALOG_STYLE_DEFAULT;
 	gamepad_data lastReadData;
 	classic_pad_data classicData;
@@ -127,13 +120,17 @@ int main(void)
 	init_config();
 
 	snes_gamepad = snesGetGamepad();
-	default_gamepad = snes_gamepad;
-	cur_gamepad = snes_gamepad;
 
 	dataToClassic(NULL, &classicData, 0);
 	pack_classic_data(&classicData, current_report, ANALOG_STYLE_DEFAULT, CLASSIC_MODE_1);
 
-	do_earlyDetection();
+#if WITH_13_BUTTON
+		wm_setAltId(adapter_snes_id);
+#else		
+		wm_setAltId(adapter_nes_id);
+#endif
+	
+	//do_earlyDetection();
 
 	wm_init(classic_id, current_report, PACKED_CLASSIC_DATA_SIZE, cal_data, pollfunc);
 	wm_start();
@@ -182,34 +179,9 @@ int main(void)
 		// E = 2.34ms (menu), 2.84ms (in game)
 		//
 
-		switch(mainState)
-		{
-			default:
-				mainState = STATE_CONTROLLER_ACTIVE;
-				break;
-
-			//case STATE_NO_CONTROLLER:
-			//	disable_config = 0;
-			//	first_controller_read = 1;
-			//	if (default_gamepad) {
-			//		default_gamepad->update();
-			//		default_gamepad->getReport(&lastReadData);
-			//	}
-			//	break;
-
-			case STATE_CONTROLLER_ACTIVE:
-				if (cur_gamepad->update()) {
-					//error_count++;
-					//if (error_count > 10)
-					//	mainState = STATE_CONTROLLER_ACTIVE;
-					//break;
-				}
-				error_count = 0;
-				cur_gamepad->getReport(&lastReadData);
-				if (first_controller_read)
-					first_controller_read++;
-				break;
-		}
+		snes_gamepad = snesGetGamepad();
+		snes_gamepad->update();
+		snes_gamepad->getReport(&lastReadData);
 
 		if (!wm_altIdEnabled())
 		{
@@ -224,9 +196,6 @@ int main(void)
 			}
 
 			dataToClassic(&lastReadData, &classicData, first_controller_read);
-			if (first_controller_read > 2) {
-				first_controller_read = 0;
-			}
 			pack_classic_data(&classicData, current_report, analog_style, mode);
 			wm_newaction(current_report, PACKED_CLASSIC_DATA_SIZE);
 		}
@@ -234,25 +203,13 @@ int main(void)
 		{
 			unsigned char raw[8];
 
-			// Changing controller is not possible in this mode
-			// unless we control the device_detect line.
-			if (lastReadData.pad_type != initial_controller)
-				 continue;
-
-			switch (initial_controller)
-			{
-				case PAD_TYPE_SNES:
-					memcpy(raw, lastReadData.snes.raw_data, sizeof(lastReadData.snes.raw_data));
-					wm_newaction(raw, sizeof(lastReadData.snes.raw_data));
-					break;
-
-				case PAD_TYPE_NES:
-					memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
-					wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
-					break;
-			}
-
-			// TODO : Controller specific report format
+#if WITH_13_BUTTON
+				memcpy(raw, lastReadData.snes.raw_data, sizeof(lastReadData.snes.raw_data));
+				wm_newaction(raw, sizeof(lastReadData.snes.raw_data));
+#else
+				memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
+				wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
+#endif
 		}
 	}
 
