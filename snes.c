@@ -52,7 +52,7 @@
 #define HOME_BUTTON_PIN    PINB
 #define HOME_BUTTON_BIT    (1<<4)
 
-#define HOME_BUTTON_DATA_BIT (1<<4)
+#define HOME_BUTTON_DATA_BIT (1<<3)
 
 
 /*********** prototypes *************/
@@ -103,36 +103,57 @@ static char snesInit(void)
 
 /*
  *
-       Bit position     Button Reported
-        ===========     ===============
-        0               B
-        1               Y  (A for NES)
-        2               Select
-        3               Start
-        4               Up on joypad
-        5               Down on joypad
-        6               Left on joypad
-        7               Right on joypad
-        8               A
-        9               X
-        10              L
-        11              R
-        12              HOME
-        13              none (always high)
-        14              none (always high)
-        15              none (always high)
+       Bit position     Button Reported           NES Button Reported        PIN
+        ===========     ===============           =====================      ===================
+        0               B                         A (Mistake = B)            PD7
+        1               Y                         B (Mistake = A)            PD6
+        2               Select                    Select                     PD5
+        3               Start                     Start                      PD4
+        4               Up on joypad              Up                         PD3
+        5               Down on joypad            Down                       PD2
+        6               Left on joypad            Left                       PD1
+        7               Right on joypad           Right                      PD0
+        8               A                         NA                         PB3
+        9               X                         NA                         PB2
+        10              L                         NA                         PB1
+        11              R                         NA                         PB0
+        12              HOME                      Home                       PB4
+        13              none (always high)        NA                         PB5 (not used)
+        14              none (always high)        NA                         XTAL1 (so ignored)
+        15              none (always high)        NA                         XTAL2 (so ignored)
  *
  */
+ 
+// bug fix
+// for left and right favor right
+// for up and down favor up
+char dpadmap[16] = {0, 1, 2, 1, 4, 5, 6, 5, 8, 9, 10, 9, 8, 9, 10, 9};
 
 static char snesUpdate(void)
 {
 	unsigned char tmp=0;
+	unsigned char tmpraw=0;
 
-	last_read_controller_bytes[0] = ~NES_8_BUTTONS_PIN;
 #if WITH_13_BUTTONS
-	tmp |= ((~SNES_5_BUTTONS_PIN) & SNES_5_BUTTONS_MASK) << SNES_5_BUTTONS_SHIFT;
+	tmpraw = ~NES_8_BUTTONS_PIN;
+    tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
+	last_read_controller_bytes[0] = tmpraw;
+	tmpraw = ((~SNES_5_BUTTONS_PIN) & SNES_5_BUTTONS_MASK);
+	tmp = (tmpraw << 4) & 0xF0;
+      if ((tmpraw & (1<<4)))
+      {
+          tmp |= (1<<3);
+      }
 #else
-	tmp |= (!(HOME_BUTTON_PIN & HOME_BUTTON_BIT)) ? HOME_BUTTON_DATA_BIT : 0;
+	tmpraw = ~NES_8_BUTTONS_PIN;
+    tmpraw = (tmpraw & 0xF0) | (dpadmap[tmpraw & 0x0F]);
+	tmp = tmpraw & 0x3F;
+    // A and B were transposed in schematic.
+	// See comment about mistake
+	if (tmpraw & (1<<7)) { tmp |= (1<<6); }
+	if (tmpraw & (1<<6)) { tmp |= (1<<7); }
+	last_read_controller_bytes[0] = tmp;
+	tmp = ((~HOME_BUTTON_PIN & HOME_BUTTON_BIT)) ? HOME_BUTTON_DATA_BIT : 0;
 #endif
 	last_read_controller_bytes[1] = tmp;
 

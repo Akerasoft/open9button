@@ -173,26 +173,21 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 	}
 
 	memset(dst, 0, sizeof(classic_pad_data));
-
-	switch (src->pad_type)
-	{
-		case PAD_TYPE_NONE:
-			break;
-
-		case PAD_TYPE_SNES:
+	
+#if WITH_13_BUTTONS
 			dst->controller_id[0] = 'S';
 			dst->controller_id[1] = 'F';
 			memcpy(dst->controller_raw_data, src->snes.raw_data, SNES_RAW_SIZE);
 
-			if (g_current_config.g_snes_nes_mode) {
-				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_B; }
-				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_A; }
-			} else {
+			//if (g_current_config.g_snes_nes_mode) {
+			//	if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_B; }
+			//	if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_A; }
+			//} else {
 				if (src->snes.buttons & SNES_BTN_B) { dst->buttons |= CPAD_BTN_B; }
 				if (src->snes.buttons & SNES_BTN_Y) { dst->buttons |= CPAD_BTN_Y; }
 				if (src->snes.buttons & SNES_BTN_A) { dst->buttons |= CPAD_BTN_A; }
 				if (src->snes.buttons & SNES_BTN_X) { dst->buttons |= CPAD_BTN_X; }
-			}
+			//}
 
 			if (g_current_config.g_snes_analog_dpad) {
 				if (src->snes.buttons & SNES_BTN_DPAD_UP) { dst->ly = 100; }
@@ -216,11 +211,11 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 				g_current_config.g_snes_analog_dpad = 0;
 				sync_config();
 			}
-			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_DOWN)) {
-				g_current_config.g_snes_nes_mode = 1;
-				g_current_config.g_snes_analog_dpad = 0;
-				sync_config();
-			}
+//			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_DOWN)) {
+//				g_current_config.g_snes_nes_mode = 1;
+//				g_current_config.g_snes_analog_dpad = 0;
+//				sync_config();
+//			}
 			if (IS_SIMULTANEOUS(src->snes.buttons, SNES_BTN_START|SNES_BTN_SELECT|SNES_BTN_L|SNES_BTN_R|SNES_BTN_DPAD_LEFT)) {
 				g_current_config.g_snes_analog_dpad = 1;
 				g_current_config.g_snes_nes_mode = 0;
@@ -239,9 +234,8 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			if (dst->buttons & CPAD_BTN_TRIG_RIGHT) {
 				dst->rt = 0xff;
 			}
-			break;
+#else
 
-		case PAD_TYPE_NES:
 //			if (first_read && src->nes.buttons & NES_BTN_START) {
 //				disable_config = 1;
 //			}
@@ -263,7 +257,5 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			//	dst->buttons |= CPAD_BTN_HOME;
 			//}
 			if (src->nes.buttons & NES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
-
-			break;
-	}
+#endif
 }

@@ -114,7 +114,7 @@ int main(void)
 	Gamepad *snes_gamepad = NULL;
 	Gamepad *cur_gamepad = NULL;
 	Gamepad *default_gamepad = NULL;
-	unsigned char mainState = STATE_NO_CONTROLLER;
+	unsigned char mainState = STATE_CONTROLLER_ACTIVE;
 	unsigned char analog_style = ANALOG_STYLE_DEFAULT;
 	gamepad_data lastReadData;
 	classic_pad_data classicData;
@@ -128,6 +128,7 @@ int main(void)
 
 	snes_gamepad = snesGetGamepad();
 	default_gamepad = snes_gamepad;
+	cur_gamepad = snes_gamepad;
 
 	dataToClassic(NULL, &classicData, 0);
 	pack_classic_data(&classicData, current_report, ANALOG_STYLE_DEFAULT, CLASSIC_MODE_1);
@@ -184,24 +185,24 @@ int main(void)
 		switch(mainState)
 		{
 			default:
-				mainState = STATE_NO_CONTROLLER;
+				mainState = STATE_CONTROLLER_ACTIVE;
 				break;
 
-			case STATE_NO_CONTROLLER:
-				disable_config = 0;
-				first_controller_read = 1;
-				if (default_gamepad) {
-					default_gamepad->update();
-					default_gamepad->getReport(&lastReadData);
-				}
-				break;
+			//case STATE_NO_CONTROLLER:
+			//	disable_config = 0;
+			//	first_controller_read = 1;
+			//	if (default_gamepad) {
+			//		default_gamepad->update();
+			//		default_gamepad->getReport(&lastReadData);
+			//	}
+			//	break;
 
 			case STATE_CONTROLLER_ACTIVE:
 				if (cur_gamepad->update()) {
-					error_count++;
-					if (error_count > 10)
-						mainState = STATE_NO_CONTROLLER;
-					break;
+					//error_count++;
+					//if (error_count > 10)
+					//	mainState = STATE_CONTROLLER_ACTIVE;
+					//break;
 				}
 				error_count = 0;
 				cur_gamepad->getReport(&lastReadData);
