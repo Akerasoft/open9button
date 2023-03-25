@@ -141,10 +141,10 @@ int main(void)
 		// Adapter without sleep: 4mA
 		// Adapter with sleep: 1.6mA
 
-		set_sleep_mode(SLEEP_MODE_EXT_STANDBY);
-		sleep_enable();
-		sleep_cpu();
-		sleep_disable();
+		//set_sleep_mode(SLEEP_MODE_EXT_STANDBY);
+		//sleep_enable();
+		//sleep_cpu();
+		//sleep_disable();
 
 		while (!performupdate) { }
 		performupdate = 0;
@@ -160,7 +160,7 @@ int main(void)
 		//
 		// This is why I chose to maintain a margin.
 		//
-		_delay_ms(2.35); // delay A
+		//_delay_ms(2.35); // delay A
 
 		//                                        |<----------- E ----------->|
 		//                               C  -->|  |<--
