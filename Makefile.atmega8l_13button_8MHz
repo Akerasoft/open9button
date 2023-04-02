@@ -8,7 +8,7 @@ CPU=atmega8
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=8000000L -Os -DWITH_SNES -DWITH_13_BUTTONS -DWITH_EEPROM
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=$(PROGNAME).map
 HEXFILE=$(PROGNAME).hex
-AVRDUDE=avrdude -p m8 -P usb -c avrispmkII
+AVRDUDE=avrdude -p m8 -P $(avrisp_comport) -c avrisp
 
 # RSTDISBL  DWEN  SPIEN   WDTON  EESAVE  BOOTSZ1    BOOOTSZ2  BOOTRST
 #    1        1      0      1      1         0          0        1
@@ -45,15 +45,15 @@ $(PROGNAME).hex: $(PROGNAME).elf
 
 fuse:
 	#$(AVRDUDE) -e -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 20.0 -v
-	$(AVRDUDE) -e -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 5.0 -v
+	$(AVRDUDE) -e -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -b 19200 -v
 
 flash: $(HEXFILE)
 	#$(AVRDUDE) -Uflash:w:$(HEXFILE) -B 1.0 -F
-	$(AVRDUDE) -Uflash:w:$(HEXFILE) -B 5.0
+	$(AVRDUDE) -Uflash:w:$(HEXFILE) -b 19200
 
 chip_erase:
-	$(AVRDUDE) -e -B 1.0 -F
+	$(AVRDUDE) -e -b 19200 -F
 
 reset:
-	$(AVRDUDE) -B 1.0 -F
+	$(AVRDUDE) -b 19200 -F
 	
