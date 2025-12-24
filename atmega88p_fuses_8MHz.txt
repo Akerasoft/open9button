@@ -1,0 +1,6 @@
+Open8button,Open9button,Open12Button,Open13Button,Open15Button for ATMEGA88P.
+Uses internal clock oscilator for 8MHz clock and does not use clock divider so the speed is 8MHz.
+Fuse settings to program.
+LFUSE = 0xE2
+HFUSE = 0xDF
+EFUSE = 0xF9
