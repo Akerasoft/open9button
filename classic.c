@@ -20,6 +20,12 @@
 #include "eeprom.h"
 #include "analog.h"
 
+#if WITH_8_BUTTONS
+#include "tripleclick.h"
+#elif WITH_12_BUTTONS
+#include "tripleclick.h"
+#endif
+
 #define C_DEFLECTION	100
 
 /*       |                 Bit                                |
@@ -351,7 +357,7 @@ void dataToClassic(const gamepad_data *src, classic_pad_data *dst, char first_re
 			if (src->nes.buttons & NES_BTN_DPAD_RIGHT) { dst->buttons |= CPAD_BTN_DPAD_RIGHT; }
 
 			if (src->nes.buttons & NES_BTN_HOME) { dst->buttons |= CPAD_BTN_HOME; }
-#else
+#elif WITH_8_BUTTONS
 			// 8 buttons
 			dst->controller_id[0] = 'F';
 			dst->controller_id[1] = 'C';

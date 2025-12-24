@@ -20,7 +20,7 @@
 #include <avr/interrupt.h>
 #include <math.h>
 #include "wiimote.h"
-#if WITH_15_BUTTON
+#if WITH_15_BUTTONS
 #include "clsc.h"
 #else
 #include "snes.h"
@@ -107,12 +107,12 @@ int main(void)
 	gamepad_data lastReadData;
 	classic_pad_data classicData;
 	unsigned char current_report[PACKED_CLASSIC_DATA_SIZE];
-	int error_count = 0;
 	char first_controller_read=0;
-	int detect_time = 0;
 
 	hwInit();
+#if WITH_EEPROM
 	init_config();
+#endif
 
 #if WITH_15_BUTTONS
 	clsc_gamepad = clscGetGamepad();
@@ -131,8 +131,7 @@ int main(void)
 		wm_setAltId(adapter_snes_id);
 #elif WITH_9_BUTTONS
 		wm_setAltId(adapter_nes_id);
-#else		
-		// 8 button is implied
+#elif WITH_8_BUTTONS
 		wm_setAltId(adapter_nes_id);
 #endif
 
@@ -225,8 +224,7 @@ int main(void)
 #elif WITH_9_BUTTONS
 				memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
 				wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
-#else
-				// 8 button
+#elif WITH_8_BUTTONS
 				memcpy(raw, lastReadData.nes.raw_data, sizeof(lastReadData.nes.raw_data));
 				wm_newaction(raw, sizeof(lastReadData.nes.raw_data));
 #endif

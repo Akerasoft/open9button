@@ -17,6 +17,8 @@
 #ifndef _eeprom_h__
 #define _eeprom_h__
 
+#if WITH_EEPROM
+
 #define EEPROM_MAGIC_SIZE		9 /* EXTENMOTE */
 #define EEPROM_BASE_PTR			((void*)0x0000)
 
@@ -56,6 +58,7 @@ void init_config(void);
 extern char disable_config;
 void chgMap(unsigned char *cfg_ptr, unsigned char new_value);
 
+#endif
 
 #endif // _eeprom_h__
 
