@@ -2,23 +2,28 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-PROGNAME=atmega8l_open9button_8MHz
+PROGNAME=atmega328p_open9button_12MHz
 OBJDIR=objs-$(PROGNAME)
-CPU=atmega8
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=8000000L -Os -DWITH_SNES -DWITH_9_BUTTONS	
+CPU=atmega328p
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=12000000L -Os -DWITH_SNES -DWITH_9_BUTTONS
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=$(PROGNAME).map
 HEXFILE=$(PROGNAME).hex
-AVRDUDE=avrdude -p m8 -P $(avrisp_comport) -c avrisp
+AVRDUDE=avrdude -p m328p -P usb -c avrispmkII
+
+#  -  -  -  -  -  BODLEVEL2  BODLEVEL1  BODLEVEL0
+#  0  0  0  0  0     1          1          1
+#EFUSE=0x07 (but usually shows as 0xFF on AVRDUDE with AVRISP)
+EFUSE=0xFF
 
 # RSTDISBL  DWEN  SPIEN   WDTON  EESAVE  BOOTSZ1    BOOOTSZ2  BOOTRST
 #    1        1      0      1      1         0          0        1
 HFUSE=0xd9
 #
-# BODLEVEL   BODEN   SUT1  SUT0  CKSEL3  CKSEL2  CKSEL1  CKSEL0
-#    1        1       1     0      0      1       0       0
+# CKDIV8   CKOUT   SUT1  SUT0  CKSEL3  CKSEL2  CKSEL1  CKSEL0
+#    1        1      0     1      1      1       1       1
 #
-# 8mhz internal RC oscillator (Ok for NES/SNES only mode)
-LFUSE=0xC4
+# 12mhz crystal
+LFUSE=0xdf
 
 OBJS=$(addprefix $(OBJDIR)/, main.o wiimote.o snes.o eeprom.o classic.o)
 
@@ -44,15 +49,16 @@ $(PROGNAME).hex: $(PROGNAME).elf
 	avr-size $(PROGNAME).elf
 
 fuse:
-	#$(AVRDUDE) -e -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 20.0 -v
-	$(AVRDUDE) -e -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -b 19200 -v
+	#$(AVRDUDE) -e -Uefuse:w:$(EFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 20.0 -v
+	$(AVRDUDE) -e -Uefuse:w:$(EFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 5.0 -v
 
 flash: $(HEXFILE)
 	#$(AVRDUDE) -Uflash:w:$(HEXFILE) -B 1.0 -F
-	$(AVRDUDE) -Uflash:w:$(HEXFILE) -b 19200
+	$(AVRDUDE) -Uflash:w:$(HEXFILE) -B 5.0
 
 chip_erase:
-	$(AVRDUDE) -e -b 19200
+	$(AVRDUDE) -e -B 1.0 -F
 
 reset:
-	$(AVRDUDE) -b 19200 -F
+	$(AVRDUDE) -B 1.0 -F
+	

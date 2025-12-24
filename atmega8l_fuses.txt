@@ -1,0 +1,5 @@
+Open9button and Open13 button for ATMEGA8L.
+Uses internal oscillator for clock and does not use clock divider so the speed is 8MHz.
+Fuse settings to program.
+LFUSE = 0xC4
+HFUSE = 0xD9

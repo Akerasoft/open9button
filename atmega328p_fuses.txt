@@ -1,0 +1,6 @@
+Open9button and Open13 button for ATMEGA328p.
+Uses 12MHz crystal for clock and does not use clock divider so the speed is 12MHz.
+Fuse settings to program.
+LFUSE = 0xDF
+HFUSE = 0xDF
+EFUSE = 0xF9
