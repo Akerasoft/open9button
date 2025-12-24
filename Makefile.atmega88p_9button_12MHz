@@ -2,7 +2,7 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-PROGNAME=atmega88p_open13button_12MHz
+PROGNAME=atmega88p_open9button_12MHz
 OBJDIR=objs-$(PROGNAME)
 CPU=atmega88p
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=12000000L -Os -DWITH_SNES -DWITH_9_BUTTONS
